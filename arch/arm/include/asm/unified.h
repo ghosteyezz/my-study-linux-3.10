@@ -25,6 +25,7 @@
 #endif
 
 #ifdef CONFIG_THUMB2_KERNEL
+/*SH arch/arm/Kconfig 파일 : config THUMB2_KERNEL*/
 
 #if __GNUC__ < 4
 #error Thumb-2 kernel requires gcc >= 4
@@ -34,10 +35,13 @@
 #define PSR_ISETSTATE	PSR_T_BIT
 
 #define ARM(x...)
+/*SH THUMB2_KERNEL일때 코드가 삭제*/
 #define THUMB(x...)	x
+/*SH THUMB2_KERNEL일때 코드가 생성*/
 #ifdef __ASSEMBLY__
 #define W(instr)	instr.w
 #define BSYM(sym)	sym + 1
+/*SH THUMB2_KERNEL일때 BSYM(sym) 은 sym +1*/
 #endif
 
 #else	/* !CONFIG_THUMB2_KERNEL */
@@ -46,10 +50,13 @@
 #define PSR_ISETSTATE	0
 
 #define ARM(x...)	x
+/*SH THUMB2_KERNEL이 아닐때 코드가 생성*/
 #define THUMB(x...)
+/*SH THUMB2_KERNEL이 아닐때 코드가 삭제*/
 #ifdef __ASSEMBLY__
 #define W(instr)	instr
 #define BSYM(sym)	sym
+/*SH THUMB2_KERNEL이 아닐때 BSYM(sym)은 걍 sym*/
 #endif
 
 #endif	/* CONFIG_THUMB2_KERNEL */

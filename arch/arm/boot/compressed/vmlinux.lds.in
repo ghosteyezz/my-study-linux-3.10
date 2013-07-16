@@ -28,7 +28,7 @@ SECTIONS
 
   .text : {
     _start = .;
-    *(.start)
+    *(.start)	/*sh arch/arm/boot/compressed/head.S의 .section ".start", #alloc, #execinstr 로 추정됨*/
     *(.text)
     *(.text.*)
     *(.fixup)
