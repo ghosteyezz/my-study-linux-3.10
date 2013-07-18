@@ -37,6 +37,7 @@ ENTRY(__boot_cpu_mode)
 	/*
 	 * Save the primary CPU boot mode. Requires 3 scratch registers.
 	 */
+/*SH END 130718-1*/
 	.macro	store_primary_cpu_mode	reg1, reg2, reg3
 	mrs	\reg1, cpsr
 	and	\reg1, \reg1, #MODE_MASK
@@ -85,6 +86,7 @@ ENTRY(__boot_cpu_mode)
 @ Call this from the primary CPU
 ENTRY(__hyp_stub_install)
 	store_primary_cpu_mode	r4, r5, r6
+	/*SH cs find s|t|e 명령어로 찾아봐야 나옴*/
 ENDPROC(__hyp_stub_install)
 
 	@ fall through...

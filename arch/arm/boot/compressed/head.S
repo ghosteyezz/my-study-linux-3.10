@@ -8,10 +8,12 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*SH START 130716-1*/
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 
 	.arch	armv7-a
+	/*SH 타깃 CPU가 armv7-a임을 나타냄*/
 /*
  * Debugging stuff
  *
@@ -25,9 +27,13 @@
 
 #if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
 		.macro	loadsp, rb, tmp
+		/*SH .macro : 매크로함수 시작*/
+		/*SH loadsp : 이름, rb,tmp : 매크로 인자*/
 		.endm
+		/*SH .endm : 매크로함수 끝*/
 		.macro	writeb, ch, rb
 		mcr	p14, 0, \ch, c0, c5, 0
+		/*SH \ch : 인자 'ch'의 값을 사용*/
 		.endm
 #elif defined(CONFIG_CPU_XSCALE)
 		.macro	loadsp, rb, tmp
@@ -114,23 +120,24 @@
 #endif
 		.endm
 
-/*SH 130716-1 START*/
 /*SH 커널시작*/
 		.section ".start", #alloc, #execinstr
-		/*SH .section : ld에서 링크스크립터가 사용하는 Address section 정의, ".start" : section 이름, #alloc : 할당가능, #execinstr : 실행가능*/
+		/*SH .section : ld에서 링크스크립터가 사용하는 Address section 정의*/
+		/*SH ".start" : section 이름, #alloc : 할당가능, #execinstr : 실행가능*/
 /*
  * sort out different calling conventions
  */
 		.align
 		/*SH .align : 다음에 올 코드의 정렬 간격을 나타냄. 기본값 2*/
-	        /*SH ex>.align 3 : arm에서는 2^3 = 8 byte 간격으로 정렬*/
+	    /*SH ex>.align 3 : arm에서는 2^3 = 8 byte 간격으로 정렬*/
 		/*SH               i386에서는 걍 3 byte 간격으로 정렬*/
 		.arm				@ Always enter in ARM state
 		/*SH .arm : arm(32bit) 명령어임을 나타냄으로 시작 */
 start:
 /*SH 라벨정의, start : 라벨이름*/
 		.type	start,#function
-		/*SH .type : 심볼(start:)의 타입을 정의, start : 심볼이름, #function : 심볼이 함수임을 나타냄*/
+		/*SH .type : 심볼(start:)의 타입을 정의*/
+		/*SH start : 심볼이름, #function : 함수임을 나타냄*/
 		.rept	7
 		/*SH .rept # : .endr을 만나기 전까지의 명령어를 #번 반복하여 어셈블함*/
 		mov	r0, r0
@@ -146,20 +153,28 @@ start:
 		/*SH FIXME r12=라벨'1'의 주소값 + 1 : +1을 해주는 이유는?*/
 		/*SH BSYM() : arch/arm/include/asm/unified.h에 정의*/
  THUMB(		bx	r12		)
-		/*SH FIXME PC=(라벨'1'의 주소값 + 1) : x의 의미를 정확히 모르겠음 : 동작설명으로는 (라벨'1'의 주소값 + 1)[0]의 값이 1이면 타겟은 Thumb, 0이면 타겟은 ARM*/
+		/*SH FIXME PC=(라벨'1'의 주소값 + 1) : x의 의미를 정확히 모르겠음*/
+		/*SH 동작설명으로는 (라벨'1'의 주소값 + 1)[0]의 값이 1이면 타겟은 Thumb, 0이면 타겟은 ARM*/
 
 		.word	0x016f2818		@ Magic numbers to help the loader
 		/*SH .word : 현재 Section(Address)에서 .align되 있는 만큼 크기로 alloc하여 값을 저장 한다*/
 		.word	start			@ absolute load/run zImage address
+		/*SH start : start 라벨을 뜻하며, 실제 0x00000000임*/
 		.word	_edata			@ zImage end address
+		/*SH _edata : arch/arm/kernel/vmlinux.lds.S에 정의되어있는 zImage의 끝 주소*/
  THUMB(		.thumb			)
 		/*SH .thumb : thumb 명령어임을 나타냄으로 시작*/
-/*SH 130716-1 END*/
+/*SH END 130716-1*/
+/*SH START 130718-1*/
 1:
 /*SH 라벨정의, 1 : 라벨이름*/
 		mrs	r9, cpsr
+		/*SH r9 = cpsr*/
+
 #ifdef CONFIG_ARM_VIRT_EXT
 		bl	__hyp_stub_install	@ get into SVC mode, reversibly
+		/*SH LR = 'mov r7, r1'명령어의 주소값, PC=__hyp_stub_install의 주소값*/
+		/*SH 즉, 돌아올 주소를 저장한 후, __hyp_stub_install로 분기한다*/
 #endif
 		mov	r7, r1			@ save architecture ID
 		mov	r8, r2			@ save atags pointer
