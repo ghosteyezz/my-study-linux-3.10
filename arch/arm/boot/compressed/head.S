@@ -177,7 +177,9 @@ start:
 		/*SH 즉, 돌아올 주소를 저장한 후, __hyp_stub_install로 분기한다*/
 #endif
 		mov	r7, r1			@ save architecture ID
+		/*SH r7 = r1 : r1은 부트로더에서 할당 후 커널로 넘어옴*/
 		mov	r8, r2			@ save atags pointer
+		/*SH r8 = r2 : r2는 부트로더에서 할당 후 커널로 넘어옴*/
 
 #ifndef __ARM_ARCH_2__
 		/*
@@ -186,15 +188,30 @@ start:
 		 * We only do this if we were in user mode on entry.
 		 */
 		mrs	r2, cpsr		@ get current mode
+		/*SH r2 = cpsr*/
 		tst	r2, #3			@ not user?
+		/*SH r2 & 3 의 결과를 cpsr의 N,Z,C 플래그 셋*/
 		bne	not_angel
+		/*SH bne : b : 분기, ne : 같지 않음*/
+		/*SH 같지 않다는 의미는 cpsr z flag를 체크하여 1이면 같음, 0이면 같지 않음으로 판정*/
+		/*SH 현재 모드가 User모드가 아니면 not_angel로 점프*/
 		mov	r0, #0x17		@ angel_SWIreason_EnterSVC
+		/*SH r0 = 0x17*/
  ARM(		swi	0x123456	)	@ angel_SWI_ARM
+			/*SH FIXME 관리자 호출 예외 : User 모드를 벗어나기 위한 방법?*/
  THUMB(		svc	0xab		)	@ angel_SWI_THUMB
+			/*SH FIXME 관리자 호출 예외 : User 모드를 벗어나기 위한 방법?*/
 not_angel:
 		safe_svcmode_maskall r0
 		msr	spsr_cxsf, r9		@ Save the CPU boot mode in
 						@ SPSR
+		/*SH 부팅당시의 cpsr의 값을 spsr에 저장한다*/
+		/*SH spsr_cxsf = r9*/
+		/*SH c : 제어 필드 마스크 바이트 PSR[7:0]*/
+		/*SH x : 확장 필드 마스크 바이트 PSR[15:8]*/
+		/*SH s : 상태 필드 마스크 바이트 PSR[23:16]*/
+		/*SH f : 플래그 필드 마스크 바이트 PSR[31:24]*/
+/*SH END 130719-1*/
 #else
 		teqp	pc, #0x0c000003		@ turn off interrupts
 #endif

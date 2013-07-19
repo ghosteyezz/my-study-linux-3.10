@@ -38,12 +38,20 @@ ENTRY(__boot_cpu_mode)
 	 * Save the primary CPU boot mode. Requires 3 scratch registers.
 	 */
 /*SH END 130718-1*/
+/*SH START 130719-1*/
 	.macro	store_primary_cpu_mode	reg1, reg2, reg3
+	/*SH argument reg1 : r4, reg2 : r5, reg3 : r6*/
 	mrs	\reg1, cpsr
+	/*SH r4 = cpsr*/
 	and	\reg1, \reg1, #MODE_MASK
+	/*SH r4 = r4 & 0x0000001f : cpsr의 모드만 마스크 저장*/
 	adr	\reg2, .L__boot_cpu_mode_offset
+	/*SH FIXME r5 = .L__boot_cpu_mode_offset : .L__boot_cpu_mode_offset의 값의 의미, 실제값을 모르겠음*/
 	ldr	\reg3, [\reg2]
+	/*SH r6 = *r5 : .L__boot_cpu_mode_offset가 가르키고 있는 주소값의 값을 r6에 저장*/
 	str	\reg1, [\reg2, \reg3]
+	/*SH *(r5 + r6) = r4*/
+	/*SH (.L__boot_cpu_mode_offset + *(.L__boot_cpu_mode_offset)) 의 주소값에 cpsr의 모드 저장 */
 	.endm
 
 	/*

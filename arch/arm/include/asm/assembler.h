@@ -248,20 +248,54 @@
  * you cannot return to the original mode.
  */
 .macro safe_svcmode_maskall reg:req
+/*SH reg : r0 = 0x17, req : non-blink value = 어떤값이든 꼭 넣어서 넘겨주어야 한다.*/
 #if __LINUX_ARM_ARCH__ >= 6
+/*SH FIXME ARMv6 이상인지 검사한다, 실제로 __LINUX_ARM_ARCH__이 어디서 셋되는지는 못찾았다.*/
 	mrs	\reg , cpsr
+	/*SH r0 = cpsr*/
 	eor	\reg, \reg, #HYP_MODE
+	/*SH r0 = r0 ^ 0x0000001a*/
+	/*SH eor이므로 검사하고자 하는 마스크(0x1a:b11010 부분)와 비트패턴이 완전히 같다면*/
+	/*SH 마스크 부분의 해당 비트는 모두 0이된다*/
 	tst	\reg, #MODE_MASK
+	/*SH r0 & 0x0000001f 하여 결과를 psr의 N,Z,C플래그 업데이트한다.*/
+	/*SH 하이퍼바이져 모드라면 결과가 0이므로 Z 플래그가 셋된다.*/
 	bic	\reg , \reg , #MODE_MASK
+	/*SH r0 = r0 & ~(0x0000001f)*/
+	/*SH r0 의 값에 모드 비트를 0으로 날린다*/
 	orr	\reg , \reg , #PSR_I_BIT | PSR_F_BIT | SVC_MODE
+	/*SH r0 = r0 | 0x00000080 | 0x00000040 | 0x00000013*/
+	/*SH r0 의 값에 I, F 플래그를 셋하고, SVC 모드로 셋한다.*/
 THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+		/*SH r0 = r0 | 0x00000020*/
+		/*SH Thumb 모드일 경우는 T 플래그도 셋한다.*/
 	bne	1f
+	/*SH 하이퍼바이져 모드가 아니라면, 라벨 '1'로 분기한다*/
+	/*SH ne : 같지 않음 : psr의 Z 플래그가 0이면 수행한다.*/
+	/*SH 위 'tst \reg, #MODE_MASK' 명령어의 결과의 psr 플래그를 보고 분기를 결정하게 된다.*/
+	/*SH Q : 왜 다음 명령어들(bic, orr)에서는 psr 플래그가 업데이트가 안될까?*/
+	/*SH A : bic, orr 명령어들이 psr 플래그를 업데이트 하려면 접미사 's'가 붙어야된다.*/
 	orr	\reg, \reg, #PSR_A_BIT
+	/*SH r0 = r0 | 0x00000100*/
+	/*SH r0 의 값에 A 플래그를 셋한다.*/
 	adr	lr, BSYM(2f)
+	/*SH lr = 라벨 '2'의 상대주소값*/
+	/*SH lr = PC + 라벨 '2'주소값 - 현재위치*/
 	msr	spsr_cxsf, \reg
+	/*SH spsr에 업데이트 하이퍼바이져가 lr로 돌아올때 spsr을 cpsr로 자동 업데이트*/
+	/*SH spsr_cxsf = r0*/
+	/*SH c : 제어 필드 마스크 바이트 PSR[7:0]*/
+	/*SH x : 확장 필드 마스크 바이트 PSR[15:8]*/
+	/*SH s : 상태 필드 마스크 바이트 PSR[23:16]*/
+	/*SH f : 플래그 필드 마스크 바이트 PSR[31:24]*/
 	__MSR_ELR_HYP(14)
+	/*SH FIXME Hex 명령어로 코딩됨 : 왜 이렇게 해야되는지는 모르겠음*/
 	__ERET
+	/*SH FIXME Hex 명령어로 코딩됨 : 왜 이렇게 해야되는지는 모르겠음*/
+	/*SH __ERET : PC = ELR, CPSR = SPSR*/
 1:	msr	cpsr_c, \reg
+	/*SH cpsr_c = r0*/
+	/*SH c : 제어 필드 마스크 바이트 PSR[7:0]*/
 2:
 #else
 /*
