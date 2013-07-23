@@ -289,10 +289,12 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
 	/*SH s : 상태 필드 마스크 바이트 PSR[23:16]*/
 	/*SH f : 플래그 필드 마스크 바이트 PSR[31:24]*/
 	__MSR_ELR_HYP(14)
-	/*SH FIXME Hex 명령어로 코딩됨 : 왜 이렇게 해야되는지는 모르겠음*/
+	/*SH 이 코드는 하이퍼바이져 전용(?)명령어 코드임 위 lr(r14)를 인자로 해당 코드 수행됨*/
+	/*SH  FIXME __MSR_ELR_HYP(14) : 의 의미?*/
 	__ERET
-	/*SH FIXME Hex 명령어로 코딩됨 : 왜 이렇게 해야되는지는 모르겠음*/
-	/*SH __ERET : PC = ELR, CPSR = SPSR*/
+	/*SH 역시 코드는 하이퍼바이져 전용(?)명령어 코드임*/
+	/*SH  FIXME __ERET : PC = ELR(lr(r14)), CPSR = SPSR 라고 짐작됨*/
+	/*SH spsr에 저장하는 이유는 위처럼 cpsr = spsr 이 수행되기땜시다*/
 1:	msr	cpsr_c, \reg
 	/*SH cpsr_c = r0*/
 	/*SH c : 제어 필드 마스크 바이트 PSR[7:0]*/

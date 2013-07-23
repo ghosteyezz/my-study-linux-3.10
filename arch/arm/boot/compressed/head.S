@@ -121,6 +121,15 @@
 		.endm
 
 /*SH 커널시작*/
+/*SH 부트로더에게 초기 넘어오는 레지스터 값들*/
+/*SH r0 = Must be 0*/
+/*SH r1 = ARM Linux machine type*/
+/*SH r2 = The physical address of the parameter list*/
+/*SH 참조 : Vincent Sanders, Booting ARM Linux*/
+/*SH zImage 관련 정보 - 이건 zImage를 이렇게 만들어야 된다는 우리들만의 약속~*/
+/*SH zImage start + 0x24 = Magic number(0x016f2818)*/
+/*SH zImage start + 0x28 = zImage start address(start)*/
+/*SH zImage start + 0x2c = zImage end address(_edata)*/
 		.section ".start", #alloc, #execinstr
 		/*SH .section : ld에서 링크스크립터가 사용하는 Address section 정의*/
 		/*SH ".start" : section 이름, #alloc : 할당가능, #execinstr : 실행가능*/
@@ -148,13 +157,14 @@ start:
 /*SH ARM()/THUMB() : arch/arm/include/asm/unified.h에 정의 */
 		/*SH r0=r0*/
    ARM(		b	1f		)
-		/*SH PC=라벨'1'의 주소값 : 라벨'1'의 주소값으로 무조건 분기*/
+			/*SH PC=라벨'1'의 주소값 : 라벨'1'의 주소값으로 무조건 분기*/
+			/*SH 라벨명 뒤의 'f'의 의미 'frontword' 앞의 주소값의 라벨'1'을 찾아 분기*/
  THUMB(		adr	r12, BSYM(1f)	)
-		/*SH FIXME r12=라벨'1'의 주소값 + 1 : +1을 해주는 이유는?*/
-		/*SH BSYM() : arch/arm/include/asm/unified.h에 정의*/
+			/*SH FIXME r12=라벨'1'의 주소값 + 1 : +1을 해주는 이유는?*/
+			/*SH BSYM() : arch/arm/include/asm/unified.h에 정의*/
  THUMB(		bx	r12		)
-		/*SH FIXME PC=(라벨'1'의 주소값 + 1) : x의 의미를 정확히 모르겠음*/
-		/*SH 동작설명으로는 (라벨'1'의 주소값 + 1)[0]의 값이 1이면 타겟은 Thumb, 0이면 타겟은 ARM*/
+			/*SH FIXME PC=(라벨'1'의 주소값 + 1) : x의 의미를 정확히 모르겠음*/
+			/*SH 동작설명으로는 (라벨'1'의 주소값 + 1)[0]의 값이 1이면 타겟은 Thumb, 0이면 타겟은 ARM*/
 
 		.word	0x016f2818		@ Magic numbers to help the loader
 		/*SH .word : 현재 Section(Address)에서 .align되 있는 만큼 크기로 alloc하여 값을 저장 한다*/
@@ -211,11 +221,11 @@ not_angel:
 		/*SH x : 확장 필드 마스크 바이트 PSR[15:8]*/
 		/*SH s : 상태 필드 마스크 바이트 PSR[23:16]*/
 		/*SH f : 플래그 필드 마스크 바이트 PSR[31:24]*/
-/*SH END 130719-1*/
 #else
 		teqp	pc, #0x0c000003		@ turn off interrupts
 #endif
-
+/*SH END 130719-1*/
+/*SH START 130723-1*/
 		/*
 		 * Note that some cache flushing and other stuff may
 		 * be needed here - is there an Angel SWI call for this?
@@ -231,13 +241,18 @@ not_angel:
 #ifdef CONFIG_AUTO_ZRELADDR
 		@ determine final kernel image address
 		mov	r4, pc
+		/*SH r4 = pc*/
 		and	r4, r4, #0xf8000000
+		/*SH r4 &= 0xf8000000*/
 		add	r4, r4, #TEXT_OFFSET
+		/*SH r4 += 0x00008000*/
 #else
 		ldr	r4, =zreladdr
 #endif
+		/*SH 실재 zImage의 text영역의 시작주소값을 r4에 저장*/
 
 		bl	cache_on
+		/*SH bl : lr = 다음명령어의 주소 저장 후 분기*/
 
 restart:	adr	r0, LC0
 		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
@@ -595,7 +610,9 @@ params:		ldr	r0, =0x10000100		@ params_phys for RPC
  *  r4, r7, r8
  */
 		.align	5
+		/*SH 2^5=32byte로 정렬*/
 cache_on:	mov	r3, #8			@ cache_on function
+			/*SH r3 = 8*/
 		b	call_cache_fn
 
 /*
@@ -664,6 +681,7 @@ __armv3_mpu_cache_on:
 #define CB_BITS 0x08
 #else
 #define CB_BITS 0x0c
+/*SH exynos에서 정의 되어 있지 않음으로 0x0c*/
 #endif
 
 __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
@@ -744,10 +762,18 @@ __armv4_mmu_cache_on:
 
 __armv7_mmu_cache_on:
 		mov	r12, lr
+		/*SH r12 = lr :돌아갈 복귀 주소를 r12에 저장*/
 #ifdef CONFIG_MMU
 		mrc	p15, 0, r11, c0, c1, 4	@ read ID_MMFR0
+		/*SH r11 = ID_MMFR0( Memory Model Feature Register 0, VMSA*/
+		/*SH A.R.M - B3.17.2(1481 page) 에서 찾아볼수 있다.*/
+		/*SH A.R.M - B4.1.89(1620 page)*/
 		tst	r11, #0xf		@ VMSA
+		/*SH ID_MMFR0[3:0] : VMSA support 를 검사*/
 		movne	r6, #CB_BITS | 0x02	@ !XN
+		/*SH ne : 같지않음 : Z bit가 1이 아님*/
+		/*SH ID_MMFR0[3:0] : VMSA support 가 0b0000 = Not supported 가 아니라면, r6 = 0x0c | 0x02*/
+/*SH END 130723-1*/
 		blne	__setup_mmu
 		mov	r0, #0
 		mcr	p15, 0, r0, c7, c10, 4	@ drain write buffer
@@ -827,9 +853,17 @@ __common_mmu_cache_on:
  *  r12 = corrupted
  */
 
+/*SH 이 루틴의 r3로 넘어오는 값은 의 의미*/
+/*SH r3 = 8 : mmu_cache on 호출*/
+/*SH r3 = 12 : mmu_cache off 호출*/
+/*SH r3 = 16 : mmu_cache flush 호출*/
 call_cache_fn:	adr	r12, proc_types
+				/*SH r12 = *(proc_types) */
 #ifdef CONFIG_CPU_CP15
 		mrc	p15, 0, r9, c0, c0	@ get processor ID
+		/*SH r9 = MIDR, Main ID Register, VMSA*/
+		/*SH A.R.M - B3.17.2(page 1481) 에서 찾아볼수 있다.*/
+		/*SH A.R.M - B4.1.105(page 1648)*/
 #else
 		ldr	r9, =CONFIG_PROCESSOR_ID
 #endif
@@ -837,11 +871,21 @@ call_cache_fn:	adr	r12, proc_types
 		ldr	r2, [r12, #4]		@ get mask
 		eor	r1, r1, r9		@ (real ^ match)
 		tst	r1, r2			@       & mask
+		/*SH proc_types의 구조체중 현재 processor를 찾아 그에 맞는 mmu_cache 관련 루틴을 호출한다*/
+		/*SH 결국 여기(exynos)에서는
+		 *	.word	0x000f0000		@ new CPU Id
+		 *	.word	0x000f0000
+		 *	W(b)	__armv7_mmu_cache_on
+		 *	W(b)	__armv7_mmu_cache_off
+		 *	W(b)	__armv7_mmu_cache_flush
+		 */
  ARM(		addeq	pc, r12, r3		) @ call cache function
+			/*SH pc = mmu_cache 관련 함수(r3값으로 결정)*/
  THUMB(		addeq	r12, r3			)
  THUMB(		moveq	pc, r12			) @ call cache function
 		add	r12, r12, #PROC_ENTRY_SIZE
 		b	1b
+		/*SH 라벨명 다음'b' = 'backward'즉 이전 주소의 라벨'1'을 찾아 분기한다*/
 
 /*
  * Table for cache operations.  This is basically:
