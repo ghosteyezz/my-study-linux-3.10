@@ -707,18 +707,41 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
 		add	r10, r9, #0x10000000	@ a reasonable RAM size
 		/*SH r10 = RAM영역의 시작주소 + 0x10000000(256MB)*/
 /*SH END 130724-1*/
+/*SH START 130724-2*/
+		/*SH translation table first-level descriptor의 포멧을 정해줌*/
 		mov	r1, #0x12		@ XN|U + section mapping
+		/*SH [4] = 1 : XN(Execute Never) = , [1:0] = 2(0b10):Section*/
+		/*SH r1 = 0x00000012*/
 		orr	r1, r1, #3 << 10	@ AP=11
+		/*SH [15:14] = 3(0b11) : AP(Access Permission) = Read only, at any privileage level*//
+		/*SH  A.R.M B3.5.1(1325 page)참고*/
+		/*SH r1 = 0x00000012 | 0x00000c00 = 0x00000c12*/
 		add	r2, r3, #16384
-1:		cmp	r1, r9			@ if virt > start of RAM
+		/*SH r2 = page directory 시작주소 + 0x4000(16384)*/
+		/*SH 다음 루프의 종료조건*/
+1:		cmp	r1, r9				@ if virt > start of RAM
 		cmphs	r10, r1			@   && end of RAM > virt
 		bic	r1, r1, #0x1c		@ clear XN|U + C + B
-		orrlo	r1, r1, #0x10		@ Set XN|U for non-RAM
+		orrlo	r1, r1, #0x10	@ Set XN|U for non-RAM
 		orrhs	r1, r1, r6		@ set RAM section settings
 		str	r1, [r0], #4		@ 1:1 mapping
 		add	r1, r1, #1048576
 		teq	r0, r2
 		bne	1b
+/*SH 일일이 귀찮으니 걍 c 스타일 루프로 표시하겠음*/
+/*SH RAM영역 시작주소를 0x40000000으로 가정함*/
+/*SH 그러므로 RAM영역 끝주소를 0x50000000으로 가정됨*/
+/*SH for( r0 = 0x40004000, r1 = 0x00000c12, r2 = 0x40008000; r0 < r2; r0 += 0x4, r1 += 0x100000 ){*/
+/*SH	r1 = r1 & ~(0x1c);										//clear XN|U + C + B*/
+/*SH	if( r1 > 0x40000000 && r1 < 0x50000000 ) r1 = r1 | 0xE;	//set RAM section settings*/
+/*SH	else r1 = r1 | 0x10;									//Set XN|U for non-RAM*/
+/*SH	*r0 = r1;*/
+/*SH }*/
+/*SH if에 따라 0xE, 0x10을 or 하는 값의 의미*/
+/*SH  A.R.M B3.5.1(1325 page)참고*/
+/*SH 0xE의 0xC(0b1100) 부분 : 0b1000 가 cacheable, 0b100 가 bufferable의 의미, RAM영역(0x40000000~0x50000000은 이렇게 셋팅*/
+/*SH 0x10(0b10000) 부분 : 0b10000 가 Execute Never 의미, RAM 이외 영역은 이렇게 셋팅됨*/
+/*SH END 130724-2*/
 /*
  * If ever we are running from Flash, then we surely want the cache
  * to be enabled also for our execution instance...  We map 2MB of it
