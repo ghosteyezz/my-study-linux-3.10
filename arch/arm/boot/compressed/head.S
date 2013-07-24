@@ -685,16 +685,28 @@ __armv3_mpu_cache_on:
 #endif
 
 __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
+				/*SH r3 = zImage 시작주소값 - 0x4000(16384)*/
+				/*SH Page directory 공간확보*/
 		bic	r3, r3, #0xff		@ Align the pointer
 		bic	r3, r3, #0x3f00
+		/*SH 0x4000이하의 주소값 클리어*/
 /*
  * Initialise the page tables, turning on the cacheable and bufferable
  * bits for the RAM area only.
  */
+/*SH RAM영역만 cacheable, bufferable하게 설정*/
 		mov	r0, r3
+		/*SH r0 = Page directory 시작주소*/
 		mov	r9, r0, lsr #18
+		/*SH r9 = (Page directory 시작주소 >> 18)*/
 		mov	r9, r9, lsl #18		@ start of RAM
+		/*SH r9 = ((Page directory 시작주소 >> 18) << 18)*/
+		/*SH r9 = Page directory 시작주소 에서 하위 18bit를 클리어*/
+		/*SH r9 = 주석에 의하면 이것이 RAM영역의 시작주소*/
+		/*SH FIXME 왜 이것이 RAM영역의 시작주소?*/
 		add	r10, r9, #0x10000000	@ a reasonable RAM size
+		/*SH r10 = RAM영역의 시작주소 + 0x10000000(256MB)*/
+/*SH END 130724-1*/
 		mov	r1, #0x12		@ XN|U + section mapping
 		orr	r1, r1, #3 << 10	@ AP=11
 		add	r2, r3, #16384
@@ -774,7 +786,9 @@ __armv7_mmu_cache_on:
 		/*SH ne : 같지않음 : Z bit가 1이 아님*/
 		/*SH ID_MMFR0[3:0] : VMSA support 가 0b0000 = Not supported 가 아니라면, r6 = 0x0c | 0x02*/
 /*SH END 130723-1*/
+/*SH START 130724-1*/
 		blne	__setup_mmu
+		/*SH 같지 않다면, lr = mov r0, #0 명령어 주소값 저장후 __setup_mmu로 분기 */
 		mov	r0, #0
 		mcr	p15, 0, r0, c7, c10, 4	@ drain write buffer
 		tst	r11, #0xf		@ VMSA
