@@ -254,6 +254,7 @@ not_angel:
 		bl	cache_on
 		/*SH bl : lr = 다음명령어의 주소 저장 후 분기*/
 
+/*SH START NEXT*/
 restart:	adr	r0, LC0
 		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
 		ldr	sp, [r0, #28]
@@ -728,36 +729,52 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
 		add	r1, r1, #1048576
 		teq	r0, r2
 		bne	1b
-/*SH 일일이 귀찮으니 걍 c 스타일 루프로 표시하겠음*/
+/*SH c 스타일 루프로 표시하겠음*/
 /*SH RAM영역 시작주소를 0x40000000으로 가정함*/
-/*SH 그러므로 RAM영역 끝주소를 0x50000000으로 가정됨*/
+/*SH 그러므로 RAM영역 끝주소가 0x50000000으로 가정됨*/
 /*SH for( r0 = 0x40004000, r1 = 0x00000c12, r2 = 0x40008000; r0 < r2; r0 += 0x4, r1 += 0x100000 ){*/
 /*SH	r1 = r1 & ~(0x1c);										//clear XN|U + C + B*/
 /*SH	if( r1 > 0x40000000 && r1 < 0x50000000 ) r1 = r1 | 0xE;	//set RAM section settings*/
 /*SH	else r1 = r1 | 0x10;									//Set XN|U for non-RAM*/
 /*SH	*r0 = r1;*/
 /*SH }*/
-/*SH if에 따라 0xE, 0x10을 or 하는 값의 의미*/
+/*SH 위 루프의 r1 값은,*/
+/*SH Short-descriptor translation table first-level descriptor formats 중 Section format으로 셋팅*/
+/*SH Section format*/
+/*SH |31:30:29:28|27:26:25:24|23:22:21:20|19:18:17:16|15:14:13:12|11:10:09:08|07:06:05:04|03:02:01:00|*/
+/*SH |                                   |  |  |  |  |  |        |     |  |           |  |  |  |  |  |*/
+/*SH | Section base address              |NS| 0|nG| S|AP|   TEX  |  AP |xx|   Domain  |XN| C| B| 1| 0|*/
+/*SH |                                   |  |  |  |  |  |        |     |  |           |  |  |  |  |  |*/
+/*SH | 8: 4: 2: 0| 8: 4: 2: 0| 8: 4: 2: 0| 8: 4: 2: 0| 8: 4: 2: 0| 8: 4: 2: 0| 8: 4: 2: 0| 8: 4: 2: 0|*/
 /*SH  A.R.M B3.5.1(1325 page)참고*/
-/*SH 0xE의 0xC(0b1100) 부분 : 0b1000 가 cacheable, 0b100 가 bufferable의 의미, RAM영역(0x40000000~0x50000000은 이렇게 셋팅*/
-/*SH 0x10(0b10000) 부분 : 0b10000 가 Execute Never 의미, RAM 이외 영역은 이렇게 셋팅됨*/
+/*SH 0xE의 0xC(0b1100) 부분 : 0b1000 가 C(cacheable), 0b100 가 B(bufferable)의 의미, RAM영역(0x40000000~0x50000000은 이렇게 셋팅*/
+/*SH 0x10(0b10000) 부분 : 0b10000 가 EN(Execute Never) 의미, RAM 이외 영역은 이렇게 셋팅됨*/
 /*SH END 130724-2*/
+/*SH START 130725-1*/
 /*
  * If ever we are running from Flash, then we surely want the cache
  * to be enabled also for our execution instance...  We map 2MB of it
  * so there is no map overlap problem for up to 1 MB compressed kernel.
  * If the execution is in RAM then we would only be duplicating the above.
  */
+/*SH 만약 플래시에서 실행된다면, 우리는 우리의 실행인스턴스를 위한 캐시를 활성화 시키기를 원한다.*/
+/*SH 우리는 1MB이상의 압축된 커널 덮어쓰기 문제가 없는 2MB의 Map이 있다.???(해석FIXME)*/
+/*SH 만약 RAM에서 실행된다면 위 코드로 Write된 Section discriptor를 덮어 쓸것이다.*/
 		orr	r1, r6, #0x04		@ ensure B is set for this
 		orr	r1, r1, #3 << 10
+		/*SH 위 Section discriptor format참고하여 C[3] = 0b1, AP[11:10] = 0b11을 셋한다*/
 		mov	r2, pc
 		mov	r2, r2, lsr #20
 		orr	r1, r1, r2, lsl #20
 		add	r0, r3, r2, lsl #2
+		/*SH Page section을 저장할 주소를 구한다.*/
+		/*SH FIXME 왜 이 주소가 되는지?*/
 		str	r1, [r0], #4
 		add	r1, r1, #1048576
 		str	r1, [r0]
+		/*SH Section discriptor를 Write한다(2page=2MB).*/
 		mov	pc, lr
+		/*SH return*/
 ENDPROC(__setup_mmu)
 
 @ Enable unaligned access on v6, to allow better code generation
@@ -813,36 +830,81 @@ __armv7_mmu_cache_on:
 		blne	__setup_mmu
 		/*SH 같지 않다면, lr = mov r0, #0 명령어 주소값 저장후 __setup_mmu로 분기 */
 		mov	r0, #0
+		/*SH r0 = 0*/
 		mcr	p15, 0, r0, c7, c10, 4	@ drain write buffer
+		/*SH A.R.M - B3.17.2(1481 page) 에서 찾아볼수 있다.*/
+		/*SH A.R.M - B4.2.5(1749 page) Data and intruction barrier operations, VMSM에서*/
+		/*SH CP15DSB, Data Synchronization Barrier operation이다.*/
+		/*SH FIXME 이 명령의 의도는?*/
 		tst	r11, #0xf		@ VMSA
+		/*SH ID_MMFR0[3:0] : VMSA support 를 검사*/
 		mcrne	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
+		/*SH ID_MMFR0[3:0] : VMSA support 가 0b0000 = Not supported 가 아니라면 실행*/
+		/*SH A.R.M - B3.17.2(1481 page) 에서 찾아볼수 있다.*/
+		/*SH A.R.M - B4.1.135(1716 page) TLBIALL, TLB Invalidate All, VMSM only*/
+		/*SH TLB를 모두 무효화 시킨다.*/
 #endif
 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
+		/*SH A.R.M - B3.17.2(1481 page) 에서 찾아볼수 있다.*/
+		/*SH A.R.M - B4.1.130(1705 page) SCTLR, System Control Register*/
+		/*SH r0 = SCTLR*/
 		bic	r0, r0, #1 << 28	@ clear SCTLR.TRE
 		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
 		orr	r0, r0, #0x003c		@ write buffer
 		bic	r0, r0, #2		@ A (no unaligned access fault)
 		orr	r0, r0, #1 << 22	@ U (v6 unaligned access model)
 						@ (needed for ARM1176)
+		/*SH r0 = 0b|xxx0|xxxx|x1xx|xxxx|x1x1|xxxx|xx11|110x|*/
 #ifdef CONFIG_MMU
 #ifdef CONFIG_CPU_ENDIAN_BE8
 		orr	r0, r0, #1 << 25	@ big-endian page tables
 #endif
 		mrcne   p15, 0, r6, c2, c0, 2   @ read ttb control reg
+		/*SH ID_MMFR0[3:0] : VMSA support 가 0b0000 = Not supported 가 아니라면 실행*/
+		/*SH A.R.M - B3.17.2(1481 page) 에서 찾아볼수 있다.*/
+		/*SH A.R.M - B4.1.153(1721 page) TTBCR, Translation Table Base Control Register, VMSA*/
+		/*SH r6 = TTBCR*/
 		orrne	r0, r0, #1		@ MMU enabled
+		/*SH r0 = 0b|xxx0|xxxx|x1xx|xxxx|x1x1|xxxx|xx11|1101|*/
 		movne	r1, #0xfffffffd		@ domain 0 = client
+		/*SH r1 = 0xfffffffd*/
 		bic     r6, r6, #1 << 31        @ 32-bit translation system
 		bic     r6, r6, #3 << 0         @ use only ttbr0
+		/*SH r6 = 0b|0xxx|xxxx|xxxx|xxxx|xxxx|xxxx|xxxx|xx00|*/
 		mcrne	p15, 0, r3, c2, c0, 0	@ load page table pointer
+		/*SH A.R.M - B3.17.2(1481 page) 에서 찾아볼수 있다.*/
+		/*SH A.R.M - B4.1.154(1726 page) TTBR0, Translation Table Base Register 0, VMSA*/
+		/*SH TTBR0 = page directory의 시작주소(r3,가정대로는 0x40004000임)*/
 		mcrne	p15, 0, r1, c3, c0, 0	@ load domain access control
+		/*SH A.R.M - B3.17.2(1481 page) 에서 찾아볼수 있다.*/
+		/*SH A.R.M - B4.1.43(1558 page) DACR, Domain Access Control Register, VMSA*/
+		/*SH DACR = 0xfffffffd*/
+		/*SH D15~D1 = Manager, D0 = Client*/
 		mcrne   p15, 0, r6, c2, c0, 2   @ load ttb control
+		/*SH A.R.M - B3.17.2(1481 page) 에서 찾아볼수 있다.*/
+		/*SH A.R.M - B4.1.153(1721 page) TTBCR, Translation Table Base Control Register, VMSA*/
+		/*SH TTBCR = 원래 TTBCR에 0b|0xxx|xxxx|xxxx|xxxx|xxxx|xxxx|xxxx|xx00|*/
+		/*SH Short-descriptor, TTBR0만 사용하겠다는 뜻*/
 #endif
 		mcr	p15, 0, r0, c7, c5, 4	@ ISB
+		/*SH A.R.M - B3.17.2(1481 page) 에서 찾아볼수 있다.*/
+		/*SH A.R.M - B4.1.39(1550 page) CP15ISB, CP15 Instruction Synchronization Barrier operation,VMSA*/
+		/*SH r0값은 무의미, FIXME Instruction Synchronization Barrier operation 이 수행된다?*/
 		mcr	p15, 0, r0, c1, c0, 0	@ load control register
+		/*SH A.R.M - B3.17.2(1481 page) 에서 찾아볼수 있다.*/
+		/*SH A.R.M - B4.1.130(1705 page) SCTLR, System Control Register*/
+		/*SH SCTLR = 원래 SCTLR에 0b|xxx0|xxxx|x1xx|xxxx|x1x1|xxxx|xx11|1101|*/
+		/*SH TRE = 0, I-cache = 1, RR cache replacement, write buffer, A = 0, U = 1, MMU = 1*/
 		mrc	p15, 0, r0, c1, c0, 0	@ and read it back
+		/*SH A.R.M - 1711 page -Note- 참고 : Write값을 업뎃 하려면 Read를 수행해주어랏을 강하게 주장*/
 		mov	r0, #0
+		/*SH r0 = 0*/
 		mcr	p15, 0, r0, c7, c5, 4	@ ISB
+		/*SH FIXME 888줄에서 하는 것을 왜 또하지?*/
 		mov	pc, r12
+		/*SH pc = 'restart : adr r0, LC0' 명령어의 주소값*/
+		/*SH 드뎌 cache_on 함수에서 return!!!!!!*/
+/*SH END 130725-1*/
 
 __fa526_cache_on:
 		mov	r12, lr
