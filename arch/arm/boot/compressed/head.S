@@ -254,10 +254,21 @@ not_angel:
 		bl	cache_on
 		/*SH bl : lr = 다음명령어의 주소 저장 후 분기*/
 
-/*SH START NEXT*/
+/*SH START 130725-2*/
 restart:	adr	r0, LC0
+			/*SH r0 = 라벨 'LC0'의 주소값*/
 		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
+		/*SH FIXME r1 = object 'LC0'의 주소값??*/
+		/*SH r2 = __bss_start*/
+		/*SH r3 = _end*/
+		/*SH r6 = _edata*/
+		/*SH r10 = input_data_end - 4*/
+		/*SH r11 = _got_start*/
+		/*SH r12(ip) = _got_end*/
 		ldr	sp, [r0, #28]
+		/*SH sp(r13) = _user_stack_end*/
+/*SH END 130725-2*/
+/*SH START NEXT*/
 
 		/*
 		 * We might be running at a different address.  We need
@@ -576,13 +587,26 @@ not_relocated:	mov	r0, #0
 		.align	2
 		.type	LC0, #object
 LC0:		.word	LC0			@ r1
+			/*SH FIXME object 'LC0'의 주소값?? */
 		.word	__bss_start		@ r2
+		/*SH FIXME vmlinux.lds.in의 __bss_start로 추정됨*/
 		.word	_end			@ r3
+		/*SH FIXME vmlinux.lds.in의 _end로 추정됨*/
 		.word	_edata			@ r6
+		/*SH FIXME vmlinux.lds.in의 _edata로 추정됨*/
 		.word	input_data_end - 4	@ r10 (inflated size location)
+		/*SH FIXME 이건 몰겠음*/
+		/*SH 우짯든 여기에 압축을 해제한 zImage 코드 사이즈가 저장됨, 이건 약속~*/
 		.word	_got_start		@ r11
+		/*SH FIXME vmlinux.lds.in의 _got_start로 추정됨*/
 		.word	_got_end		@ ip
+		/*SH FIXME vmlinux.lds.in의 _got_end로 추정됨*/
 		.word	.L_user_stack_end	@ sp
+		/*SH 이 파일 맨 마지막에 정의되어 있음*/
+		/*SH		.align*/
+		/*SH		.section ".stack", "aw", %nobits*/
+		/*SH .L_user_stack:	.space	4096*/
+		/*SH .L_user_stack_end:*/
 		.size	LC0, . - LC0
 
 #ifdef CONFIG_ARCH_RPC
@@ -1468,4 +1492,5 @@ reloc_code_end:
 		.align
 		.section ".stack", "aw", %nobits
 .L_user_stack:	.space	4096
+/*SH .space 4096 : 여기에 공간을 4096만큼 만들어라*/
 .L_user_stack_end:
