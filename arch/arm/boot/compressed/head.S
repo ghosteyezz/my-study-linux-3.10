@@ -121,6 +121,9 @@
 		.endm
 
 /*SH 커널시작*/
+/*SH 엄청난 가정을 해야한다. 바로 zImage 가 로딩되는 램주소.. 그래야 뒤의 커널 압축해제,atag,page section 등의 주소값 계산이 편하다*/
+/*SH u-boot의 exynos셋팅을 참고로 다음 가정을 한다.*/
+/*SH zImage 가 로딩되는 램주소 : 0x43E00000*/
 /*SH 부트로더에게 초기 넘어오는 레지스터 값들*/
 /*SH r0 = Must be 0*/
 /*SH r1 = ARM Linux machine type*/
@@ -128,8 +131,8 @@
 /*SH 참조 : Vincent Sanders, Booting ARM Linux*/
 /*SH zImage 관련 정보 - 이건 zImage를 이렇게 만들어야 된다는 우리들만의 약속~*/
 /*SH zImage start + 0x24 = Magic number(0x016f2818)*/
-/*SH zImage start + 0x28 = zImage start address(start)*/
-/*SH zImage start + 0x2c = zImage end address(_edata)*/
+/*SH zImage start + 0x28 = abs zImage start address(start)*/
+/*SH zImage start + 0x2c = abs zImage end address(_edata)*/
 		.section ".start", #alloc, #execinstr
 		/*SH .section : ld에서 링크스크립터가 사용하는 Address section 정의*/
 		/*SH ".start" : section 이름, #alloc : 할당가능, #execinstr : 실행가능*/
@@ -241,11 +244,12 @@ not_angel:
 #ifdef CONFIG_AUTO_ZRELADDR
 		@ determine final kernel image address
 		mov	r4, pc
-		/*SH r4 = pc*/
+		/*SH pc = 0x43e000a4*/
+		/*SH r4 = 0x43e000a4*/
 		and	r4, r4, #0xf8000000
-		/*SH r4 &= 0xf8000000*/
+		/*SH r4 = 0x43e000a4 & 0xf8000000 = 0x40000000*/
 		add	r4, r4, #TEXT_OFFSET
-		/*SH r4 += 0x00008000*/
+		/*SH r4 = 0x40000000 + 0x00008000 = 0x40008000*/
 #else
 		ldr	r4, =zreladdr
 #endif
@@ -256,33 +260,42 @@ not_angel:
 
 /*SH START 130725-2*/
 restart:	adr	r0, LC0
-			/*SH r0 = 라벨 'LC0'의 주소값*/
+			/*SH r0 = 라벨 'LC0'의 상대(현재 램에 로딩된) 주소값 : 0x43e002ac*/
 		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
-		/*SH FIXME r1 = object 'LC0'의 주소값??*/
-		/*SH r2 = __bss_start*/
-		/*SH r3 = _end*/
-		/*SH r6 = _edata*/
-		/*SH r10 = input_data_end - 4*/
-		/*SH r11 = _got_start*/
-		/*SH r12(ip) = _got_end*/
+		/*SH r1 = 'LC0'의 절대 주소값 : 0x000002ac*/
+		/*SH r2 = __bss_start : 0x00280448 */
+		/*SH r3 = _end : 0x0028046c*/
+		/*SH r6 = _edata : 0x00280448*/
+		/*SH r10 = input_data_end - 4 : 0x00280400*/
+		/*SH r11 = _got_start : 0x00280410*/
+		/*SH r12 = _got_end : 0x00280440*/
 		ldr	sp, [r0, #28]
-		/*SH sp(r13) = _user_stack_end*/
+		/*SH sp = .L_user_stack_end : 0x00281470*/
 /*SH END 130725-2*/
-/*SH START NEXT*/
+/*SH START 130729-1*/
 
 		/*
 		 * We might be running at a different address.  We need
 		 * to fix up various pointers.
 		 */
 		sub	r0, r0, r1		@ calculate the delta offset
+		/*SH r0 = 0x43e002ac - 0x000002ac = 0x43e00000*/
+		/*SH 램영역의 델타오프셋을 구함*/
 		add	r6, r6, r0		@ _edata
+		/*SH r6 = 0x00280448 + 0x43e00000 = 0x44080448*/
+		/*SH 실제 램 영역의 _edata의 주소를 구함*/
 		add	r10, r10, r0		@ inflated kernel size location
+		/*SH r10 = 0x00280400 + 0x43e00000 = 0x44080400*/
+		/*SH 실제 램 영역의 input_data_end - 4의 주소를 구함*/
 
 		/*
 		 * The kernel build system appends the size of the
 		 * decompressed kernel at the end of the compressed data
 		 * in little-endian form.
 		 */
+		/*SH input_data_end-4에 위치한, 실제 압축푼 커널 사이즈의 값을 무조건 little-endian 값을 바꾸어줌*/
+/*SH END 130729-1*/
+/*SH START NEXT*/
 		ldrb	r9, [r10, #0]
 		ldrb	lr, [r10, #1]
 		orr	r9, r9, lr, lsl #8
@@ -587,22 +600,22 @@ not_relocated:	mov	r0, #0
 		.align	2
 		.type	LC0, #object
 LC0:		.word	LC0			@ r1
-			/*SH FIXME object 'LC0'의 주소값?? */
+			/*SH 'LC0'의 절대 주소값 : 0x000002ac*/
 		.word	__bss_start		@ r2
-		/*SH FIXME vmlinux.lds.in의 __bss_start로 추정됨*/
+		/*SH vmlinux.lds.in의 __bss_start : 0x00280448 */
 		.word	_end			@ r3
-		/*SH FIXME vmlinux.lds.in의 _end로 추정됨*/
+		/*SH vmlinux.lds.in의 _end : 0x0028046c*/
 		.word	_edata			@ r6
-		/*SH FIXME vmlinux.lds.in의 _edata로 추정됨*/
+		/*SH vmlinux.lds.in의 _edata : 0x00280448*/
 		.word	input_data_end - 4	@ r10 (inflated size location)
-		/*SH FIXME 이건 몰겠음*/
-		/*SH 우짯든 여기에 압축을 해제한 zImage 코드 사이즈가 저장됨, 이건 약속~*/
+		/*SH input_data_end : arch/arm/boot/compressed/piggy.gzip.S에 정의 - 4 : 0x00280400*/
+		/*SH piggy.gzip의 바로 다음 4Byte공간으로 여기에 압축 해제 한 커널 이미지 사이즈가 저장됨, 이건 약속~*/
 		.word	_got_start		@ r11
-		/*SH FIXME vmlinux.lds.in의 _got_start로 추정됨*/
+		/*SH vmlinux.lds.in의 _got_start : 0x00280410*/
 		.word	_got_end		@ ip
-		/*SH FIXME vmlinux.lds.in의 _got_end로 추정됨*/
+		/*SH vmlinux.lds.in의 _got_end : 0x00280440*/
 		.word	.L_user_stack_end	@ sp
-		/*SH 이 파일 맨 마지막에 정의되어 있음*/
+		/*SH .L_user_stack_end : 이 파일 마지막에 다음과 같이 정의 : 0x00281470*/
 		/*SH		.align*/
 		/*SH		.section ".stack", "aw", %nobits*/
 		/*SH .L_user_stack:	.space	4096*/
@@ -738,7 +751,7 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
 		/*SH [4] = 1 : XN(Execute Never) = , [1:0] = 2(0b10):Section*/
 		/*SH r1 = 0x00000012*/
 		orr	r1, r1, #3 << 10	@ AP=11
-		/*SH [15:14] = 3(0b11) : AP(Access Permission) = Read only, at any privileage level*//
+		/*SH [15:14] = 3(0b11) : AP(Access Permission) = Read only, at any privileage level*/
 		/*SH  A.R.M B3.5.1(1325 page)참고*/
 		/*SH r1 = 0x00000012 | 0x00000c00 = 0x00000c12*/
 		add	r2, r3, #16384
