@@ -263,14 +263,14 @@ restart:	adr	r0, LC0
 			/*SH r0 = 라벨 'LC0'의 상대(현재 램에 로딩된) 주소값 : 0x43e002ac*/
 		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
 		/*SH r1 = 'LC0'의 절대 주소값 : 0x000002ac*/
-		/*SH r2 = __bss_start : 0x00280448 */
-		/*SH r3 = _end : 0x0028046c*/
-		/*SH r6 = _edata : 0x00280448*/
-		/*SH r10 = input_data_end - 4 : 0x00280400*/
-		/*SH r11 = _got_start : 0x00280410*/
-		/*SH r12 = _got_end : 0x00280440*/
+		/*SH r2 = __bss_start : 0x00280468 */
+		/*SH r3 = _end : 0x0028048c*/
+		/*SH r6 = _edata : 0x00280468*/
+		/*SH r10 = input_data_end - 4 : 0x00280424 - 4 = 0x00280420*/
+		/*SH r11 = _got_start : 0x00280430*/
+		/*SH r12 = _got_end : 0x00280460*/
 		ldr	sp, [r0, #28]
-		/*SH sp = .L_user_stack_end : 0x00281470*/
+		/*SH sp = .L_user_stack_end : 0x00281490*/
 /*SH END 130725-2*/
 /*SH START 130729-1*/
 
@@ -282,10 +282,10 @@ restart:	adr	r0, LC0
 		/*SH r0 = 0x43e002ac - 0x000002ac = 0x43e00000*/
 		/*SH 램영역의 델타오프셋을 구함*/
 		add	r6, r6, r0		@ _edata
-		/*SH r6 = 0x00280448 + 0x43e00000 = 0x44080448*/
+		/*SH r6 = 0x00280468 + 0x43e00000 = 0x44080468*/
 		/*SH 실제 램 영역의 _edata의 주소를 구함*/
 		add	r10, r10, r0		@ inflated kernel size location
-		/*SH r10 = 0x00280400 + 0x43e00000 = 0x44080400*/
+		/*SH r10 = 0x00280420 + 0x43e00000 = 0x44080420*/
 		/*SH 실제 램 영역의 input_data_end - 4의 주소를 구함*/
 
 		/*
@@ -295,19 +295,33 @@ restart:	adr	r0, LC0
 		 */
 		/*SH input_data_end-4에 위치한, 실제 압축푼 커널 사이즈의 값을 무조건 little-endian 값을 바꾸어줌*/
 /*SH END 130729-1*/
-/*SH START NEXT*/
+/*SH START 130802-1*/
+		/*SH vmlinux*/
+		/*SH objdump -D --adjust-vma --start-address --stop-address 옵션을 이용하여 다음 내용을 추출함*/
+		/*SH r10 = 44080420 : *(0x44080420) = 004f82e0*/
 		ldrb	r9, [r10, #0]
+		/*SH r9 = 0xe0*/
 		ldrb	lr, [r10, #1]
+		/*SH r14(lr) = 0x82*/
 		orr	r9, r9, lr, lsl #8
+		/*SH r9 = 0xe0 | (0x82 << 8) = 0x82e0*/
 		ldrb	lr, [r10, #2]
+		/*SH r14(lr) = 0x4f*/
 		ldrb	r10, [r10, #3]
+		/*SH r10 = 0x00*/
 		orr	r9, r9, lr, lsl #16
+		/*SH r9 = 0x82e0 | (0x4f << 16) = 0x4f82e0*/
 		orr	r9, r9, r10, lsl #24
+		/*SH r9 = 0x4f82e0 | (0x00 << 24) = 0x004f82e0*/
 
 #ifndef CONFIG_ZBOOT_ROM
 		/* malloc space is above the relocated stack (64k max) */
 		add	sp, sp, r0
+		/*SH r13(sp) = 0x00281490 + 0x43e00000 = 0x44081490*/
+		/*SH 실제 램 영역의 stack의 주소를 구함*/
 		add	r10, sp, #0x10000
+		/*SH r10 = 0x44081490 + 0x10000 = 0x44091490*/
+		/*SH r10 : 64k 스텍영역을 포함한  끝 주소값*/
 #else
 		/*
 		 * With ZBOOT_ROM the bss/stack is non relocatable,
@@ -318,34 +332,54 @@ restart:	adr	r0, LC0
 #endif
 
 		mov	r5, #0			@ init dtb size to 0
+		/*SH r5 = 0*/
 #ifdef CONFIG_ARM_APPENDED_DTB
 /*
  *   r0  = delta
+ *   SH	   0x43E00000 
  *   r2  = BSS start
+ *   SH    0x00280468
  *   r3  = BSS end
+ *   SH    0x0028048c
  *   r4  = final kernel address
+ *   SH    0x400080000
  *   r5  = appended dtb size (still unknown)
+ *   SH    0
  *   r6  = _edata
+ *   SH    0x44080468
  *   r7  = architecture ID
  *   r8  = atags/device tree pointer
  *   r9  = size of decompressed image
+ *   SH    0x004f82e0
  *   r10 = end of this image, including  bss/stack/malloc space if non XIP
+ *   SH    0x44091490
  *   r11 = GOT start
+ *   SH    0x00280430
  *   r12 = GOT end
+ *   SH    0x00280460
  *   sp  = stack pointer
+ *   SH    0x44081490
  *
  * if there are device trees (dtb) appended to zImage, advance r10 so that the
  * dtb data will get relocated along with the kernel if necessary.
  */
 
 		ldr	lr, [r6, #0]
+		/*SH vmlinux*/
+		/*SH objdump -D --adjust-vma --start-address --stop-address 명령을 이용하여 다음 값을 추출함*/
+		/*SH r14(lr) = *(0x44080468) _edata가 가르키는 주소의 값 = 0x00000000*/
 #ifndef __ARMEB__
 		ldr	r1, =0xedfe0dd0		@ sig is 0xd00dfeed big endian
 #else
 		ldr	r1, =0xd00dfeed
 #endif
 		cmp	lr, r1
+		/*SH 값을 비교*/
 		bne	dtb_check_done		@ not found
+		/*SH 값이 같지 않다면 dtb_check_done으로 분기*/
+		/*SH FIXME 일반적으로 엑시노스는 DTB를 지원하므로 아마 위 BNE 명령어가 수행되지 않고 진행될 것이다.*/
+/*SH END 130802-1*/
+/*SH START 130802-2*/
 
 #ifdef CONFIG_ARM_ATAG_DTB_COMPAT
 		/*
@@ -358,11 +392,18 @@ restart:	adr	r0, LC0
 		 * code we're about to call uses any global variable.
 		*/
 		add	sp, sp, #0x10000
+		/*SH sp(r13) = 0x44081490 + 0x10000 = 0x44091490*/
+		/*SH 스텍영역을 할당함(64K)*/
 		stmfd	sp!, {r0-r3, ip, lr}
+		/*SH r0~r3,ip(r12),lr(r14) 의 값을 스텍에 저장*/
 		mov	r0, r8
+		/*SH r0 = atags/device tree pointer : atags_to_fdt의 void *atag_list 인자값으로 넘어감*/
 		mov	r1, r6
+		/*SH r1 = _edata(0x44080468) : void *fdt 인자값으로 넘어감*/
 		sub	r2, sp, r6
+		/*SH r2 = sp - _edata(0x44091490 - 0x44080468) = 0x11028 : atags_to_fdt의 int total_space 인자값으로 넘어감*/
 		bl	atags_to_fdt
+		/*SH fdt 자료구조를 _edata 이후의 램 영역에 만든다.*/
 
 		/*
 		 * If returned value is 1, there is no ATAG at the location
@@ -375,12 +416,21 @@ restart:	adr	r0, LC0
 		mov	r1, r6
 		sub	r2, sp, r6
 		bleq	atags_to_fdt
+		/*SH 만약 r8 로 atag정보가 없다면, 보통 램영역의 + 0x100 영역에 atag정보가 있는지 확인을 해본다.*/
+		/*SH 램 + 0x100 영역의 atag 정보는 역사적으로 일반적인 정석으로 여겨지므로 시도해볼 만하다. */
 
 		ldmfd	sp!, {r0-r3, ip, lr}
+		/*SH sp에 저장되어 졌던 r0~r3, ip(r12), lr(r14) 값 다시 읽어옴*/
 		sub	sp, sp, #0x10000
+		/*SH sp(r13) = 0x44091490 - 0x10000 = 0x44081490*/
+		/*SH sp 주소 복귀*/
 #endif
 
 		mov	r8, r6			@ use the appended device tree
+		/*SH r8 = _edata(0x44080468) -> fdt의 주소값*/
+		/*SH _edata 부터 fdt의 자료구조가 저장되 있으므로 결국 fdt의 주소값*/
+/*SH END 130802-2*/
+/*SH START NEXT*/
 
 		/*
 		 * Make sure that the DTB doesn't end up in the final
@@ -597,25 +647,27 @@ not_relocated:	mov	r0, #0
 		b	__enter_kernel
 #endif
 
+/*SH vmlinux*/
+/*SH object -D 명령을 이용하여 라벨의 주소값을 찾은 후, objdump -d --adjust-vma 명령을 이용하여 다음을 추출함*/
 		.align	2
 		.type	LC0, #object
 LC0:		.word	LC0			@ r1
 			/*SH 'LC0'의 절대 주소값 : 0x000002ac*/
 		.word	__bss_start		@ r2
-		/*SH vmlinux.lds.in의 __bss_start : 0x00280448 */
+		/*SH vmlinux.lds.in의 __bss_start : 0x00280468 */
 		.word	_end			@ r3
-		/*SH vmlinux.lds.in의 _end : 0x0028046c*/
+		/*SH vmlinux.lds.in의 _end : 0x0028048c*/
 		.word	_edata			@ r6
-		/*SH vmlinux.lds.in의 _edata : 0x00280448*/
+		/*SH vmlinux.lds.in의 _edata : 0x00280468*/
 		.word	input_data_end - 4	@ r10 (inflated size location)
-		/*SH input_data_end : arch/arm/boot/compressed/piggy.gzip.S에 정의 - 4 : 0x00280400*/
+		/*SH input_data_end : arch/arm/boot/compressed/piggy.gzip.S에 정의 - 4 : 0x00280420*/
 		/*SH piggy.gzip의 바로 다음 4Byte공간으로 여기에 압축 해제 한 커널 이미지 사이즈가 저장됨, 이건 약속~*/
 		.word	_got_start		@ r11
-		/*SH vmlinux.lds.in의 _got_start : 0x00280410*/
+		/*SH vmlinux.lds.in의 _got_start : 0x00280430*/
 		.word	_got_end		@ ip
-		/*SH vmlinux.lds.in의 _got_end : 0x00280440*/
+		/*SH vmlinux.lds.in의 _got_end : 0x00280460*/
 		.word	.L_user_stack_end	@ sp
-		/*SH .L_user_stack_end : 이 파일 마지막에 다음과 같이 정의 : 0x00281470*/
+		/*SH .L_user_stack_end : 이 파일 마지막에 다음과 같이 정의 : 0x00281490*/
 		/*SH		.align*/
 		/*SH		.section ".stack", "aw", %nobits*/
 		/*SH .L_user_stack:	.space	4096*/
