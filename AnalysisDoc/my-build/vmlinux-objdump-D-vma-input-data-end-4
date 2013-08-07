@@ -1,0 +1,8 @@
+
+arch/arm/boot/compressed/vmlinux:     file format elf32-littlearm
+
+
+Disassembly of section .piggydata:
+
+44080420 <input_data_end+0x43dffffc>:
+44080420:	004f82e0 	subeq	r8, pc, r0, ror #5
