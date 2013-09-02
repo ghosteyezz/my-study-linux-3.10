@@ -1,9 +1,0 @@
-
-arch/arm/boot/compressed/vmlinux:     file format elf32-littlearm
-
-
-Disassembly of section .bss:
-
-44080468 <malloc_ptr+0x43dfffe0>:
-44080468:	00000000 	andeq	r0, r0, r0
-	...
